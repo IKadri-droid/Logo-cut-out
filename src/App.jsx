@@ -84,6 +84,28 @@ export default function App() {
     for (const item of itemsRef.current) revokeItem(item);
   }, []);
 
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const target = e.target;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+
+      const files = [];
+      for (const item of e.clipboardData?.items || []) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+      if (files.length === 0) return;
+
+      e.preventDefault();
+      onFilesChosen(files);
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [onFilesChosen]);
+
   const clearAll = () => {
     for (const item of items) revokeItem(item);
     setItems([]);
@@ -236,7 +258,7 @@ export default function App() {
             multiple
             onChange={(e) => onFilesChosen(e.target.files)}
           />
-          <div className="dz-label">Drop images, or click to choose one or more</div>
+          <div className="dz-label">Drop images, paste (Ctrl/Cmd+V), or click to choose one or more</div>
           <div className="dz-hint">PNG, JPEG or WebP — processed on this machine only.</div>
         </div>
 
