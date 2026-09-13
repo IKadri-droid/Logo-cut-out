@@ -24,6 +24,20 @@ function imageDataToPngBlob(data, width, height) {
 }
 
 /**
+ * True if any pixel is already partially or fully transparent — the image
+ * has already been cut out (its own previous result, or any PNG with real
+ * alpha). Re-running chroma-key on it would misread its cleared-to-black
+ * transparent areas as a new, unrelated background and start eating into
+ * the already-correct edges.
+ */
+function hasExistingTransparency(data) {
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] !== 255) return true;
+  }
+  return false;
+}
+
+/**
  * Cuts the subject out of `file`. `mode` picks what handles a non-flat
  * background: `"offline"` (default) uses the AI model bundled in the
  * browser, no network involved; `"online"` sends the image to a
@@ -34,11 +48,22 @@ function imageDataToPngBlob(data, width, height) {
  * A flat/near-uniform background always takes the deterministic
  * chroma-key path regardless of `mode` — no model does that better.
  *
- * Returns `{ blob, engine, fallbackReason? }`, `engine` being `"flat"`,
- * `"ai-offline"` or `"ai-online"`.
+ * If `file` already has any transparency, it's returned as-is: it has
+ * already been cut out (most likely one of this app's own results fed back
+ * in), and re-running chroma-key on it would misread its cleared,
+ * already-transparent pixels as a brand new background to remove.
+ *
+ * Returns `{ blob, engine, fallbackReason? }`, `engine` being `"passthrough"`,
+ * `"flat"`, `"ai-offline"` or `"ai-online"`.
  */
 export async function cutOut(file, onProgress, { mode = "offline" } = {}) {
   const original = await loadImageData(file);
+
+  if (hasExistingTransparency(original.data)) {
+    onProgress?.(1, "already-transparent");
+    const blob = await imageDataToPngBlob(original.data, original.width, original.height);
+    return { blob, engine: "passthrough" };
+  }
 
   const flat = cutOutFlatBackground({ data: original.data, width: original.width, height: original.height });
   if (flat) {
