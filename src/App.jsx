@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cutOut } from "./lib/removeBackground.js";
 import { createBatchItems, runBatch } from "./lib/batch.js";
+import { zipBlobs } from "./lib/zip.js";
 
 const THEMES = ["auto", "light", "dark"];
 
@@ -27,9 +28,41 @@ function downloadNameFor(item) {
 export default function App() {
   const [theme, setTheme] = useTheme();
   const [items, setItems] = useState([]);
+  const [selected, setSelected] = useState(() => new Set());
   const [dragOver, setDragOver] = useState(false);
+  const [zipping, setZipping] = useState(false);
   const inputRef = useRef(null);
   const urlsRef = useRef(new Map());
+
+  const doneItems = useMemo(() => items.filter((item) => item.status === "done"), [items]);
+  const selectedItems = useMemo(() => doneItems.filter((item) => selected.has(item.id)), [doneItems, selected]);
+
+  const toggleSelected = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => setSelected(new Set(doneItems.map((item) => item.id)));
+  const selectNone = () => setSelected(new Set());
+
+  const downloadSelected = async () => {
+    setZipping(true);
+    try {
+      const zip = await zipBlobs(selectedItems.map((item) => ({ name: downloadNameFor(item), blob: item.resultBlob })));
+      const url = URL.createObjectURL(zip);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "logo-cut-out.zip";
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setZipping(false);
+    }
+  };
 
   const updateItem = useCallback((id, patch) => {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -63,6 +96,7 @@ export default function App() {
     for (const url of urlsRef.current.values()) URL.revokeObjectURL(url);
     urlsRef.current.clear();
     setItems([]);
+    setSelected(new Set());
   };
 
   return (
@@ -120,16 +154,40 @@ export default function App() {
           <section className="batch-area">
             <div className="batch-toolbar">
               <span className="batch-count">{items.length} image{items.length > 1 ? "s" : ""}</span>
-              <button type="button" className="btn-secondary" onClick={clearAll}>
-                Clear all
-              </button>
+              <div className="batch-actions">
+                {doneItems.length > 0 && (
+                  <>
+                    <button type="button" className="btn-secondary" onClick={selectAll}>
+                      Select all
+                    </button>
+                    <button type="button" className="btn-secondary" onClick={selectNone}>
+                      Select none
+                    </button>
+                    <button type="button" disabled={selectedItems.length === 0 || zipping} onClick={downloadSelected}>
+                      {zipping ? "Zipping…" : `Download selected (${selectedItems.length}) as .zip`}
+                    </button>
+                  </>
+                )}
+                <button type="button" className="btn-secondary" onClick={clearAll}>
+                  Clear all
+                </button>
+              </div>
             </div>
 
             <div className="batch-grid">
               {items.map((item) => (
-                <div className="batch-card" key={item.id}>
+                <div className={`batch-card${selected.has(item.id) ? " selected" : ""}`} key={item.id}>
                   <div className="batch-thumb checker">
                     {item.status === "done" && <img src={urlsRef.current.get(item.id)} alt={item.name} />}
+                    {item.status === "done" && (
+                      <label className="batch-select">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(item.id)}
+                          onChange={() => toggleSelected(item.id)}
+                        />
+                      </label>
+                    )}
                   </div>
                   <div className="batch-info">
                     <span className="batch-name">{item.name}</span>
