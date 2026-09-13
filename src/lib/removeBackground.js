@@ -1,5 +1,5 @@
 import { removeBackground as removeBackgroundAI } from "@imgly/background-removal";
-import { cutOutFlatBackground, refineAlphaMatte } from "./cutout/engine.js";
+import { cutOutFlatBackground } from "./cutout/engine.js";
 
 async function loadImageData(source) {
   const bitmap = await createImageBitmap(source);
@@ -36,8 +36,11 @@ function imageDataToPngBlob(data, width, height) {
  *   naive alpha cutout leaves behind. No model, no download, no loss.
  * - Anything else (a real photographic background): an in-browser AI
  *   segmentation model (WASM/WebGPU, via `@imgly/background-removal`)
- *   estimates the mask, and the same edge re-matting pass then cleans up
- *   its soft, sometimes background-tinted boundary.
+ *   estimates a soft alpha mask directly, which is returned as-is — a
+ *   photographic mask can legitimately have partial transparency far from
+ *   any hard edge (hair, motion blur, glow), so re-snapping it to the
+ *   nearest "confident" color like the flat-background path does would
+ *   corrupt exactly those pixels.
  *
  * Returns `{ blob, engine }`, `engine` being `"flat"` or `"ai"`.
  */
@@ -51,11 +54,8 @@ export async function cutOut(file, onProgress) {
     return { blob, engine: "flat" };
   }
 
-  const aiBlob = await removeBackgroundAI(file, {
+  const blob = await removeBackgroundAI(file, {
     progress: (key, current, total) => onProgress?.(total > 0 ? current / total : 0, key),
   });
-  const aiImageData = await loadImageData(aiBlob);
-  const refined = refineAlphaMatte({ data: aiImageData.data, width: aiImageData.width, height: aiImageData.height });
-  const blob = await imageDataToPngBlob(refined.data, refined.width, refined.height);
   return { blob, engine: "ai" };
 }

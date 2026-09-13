@@ -224,22 +224,3 @@ export function cutOutFlatBackground(imageData, options = {}) {
   const out = matteEdges(data, width, height, backgroundMask, edgeBand, matchRadius);
   return { data: out, width, height };
 }
-
-/**
- * Cleans up an AI segmentation mask's soft, sometimes background-tinted
- * edges with the same re-matting used by the flat-background path: exact
- * color away from the cut, re-derived color right at it.
- */
-export function refineAlphaMatte(imageData, options = {}) {
-  const { data, width, height } = imageData;
-  const { alphaThreshold = 16, edgeBand = DEFAULT_EDGE_BAND, matchRadius = DEFAULT_MATCH_RADIUS } = options;
-
-  const size = width * height;
-  const backgroundMask = new Uint8Array(size);
-  for (let idx = 0; idx < size; idx++) {
-    backgroundMask[idx] = data[idx * 4 + 3] <= alphaThreshold ? 1 : 0;
-  }
-
-  const out = matteEdges(data, width, height, backgroundMask, edgeBand, matchRadius);
-  return { data: out, width, height };
-}
