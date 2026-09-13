@@ -11,6 +11,7 @@ const MODES = [
 ];
 
 const ENGINE_LABELS = {
+  passthrough: "already transparent",
   flat: "precision chroma-key",
   "ai-offline": "AI segmentation (offline)",
   "ai-online": "AI segmentation (online)",
