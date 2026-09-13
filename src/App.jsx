@@ -102,16 +102,26 @@ export default function App() {
   const selectAll = () => setSelected(new Set(doneItems.map((item) => item.id)));
   const selectNone = () => setSelected(new Set());
 
+  const triggerDownload = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const downloadSelected = async () => {
+    if (selectedItems.length === 1) {
+      const [only] = selectedItems;
+      triggerDownload(only.resultBlob, downloadNameFor(only));
+      return;
+    }
+
     setZipping(true);
     try {
       const zip = await zipBlobs(selectedItems.map((item) => ({ name: downloadNameFor(item), blob: item.resultBlob })));
-      const url = URL.createObjectURL(zip);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "logo-cut-out.zip";
-      a.click();
-      URL.revokeObjectURL(url);
+      triggerDownload(zip, "logo-cut-out.zip");
     } finally {
       setZipping(false);
     }
@@ -244,7 +254,11 @@ export default function App() {
                       Select none
                     </button>
                     <button type="button" disabled={selectedItems.length === 0 || zipping} onClick={downloadSelected}>
-                      {zipping ? "Zipping…" : `Download selected (${selectedItems.length}) as .zip`}
+                      {zipping
+                        ? "Zipping…"
+                        : selectedItems.length === 1
+                          ? "Download selected (1)"
+                          : `Download selected (${selectedItems.length}) as .zip`}
                     </button>
                   </>
                 )}
