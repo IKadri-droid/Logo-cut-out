@@ -14,11 +14,11 @@
 
 ## Features
 
-- 🖼️ **Drag & drop or file picker** — PNG, JPEG or WebP in, transparent PNG out.
+- 🖼️ **Drag & drop or file picker, one image or a batch** — PNG, JPEG or WebP in, transparent PNG out.
 - ⚡ **Fully client-side** — nothing is ever sent to a server, whichever engine below handles the cut.
 - 🎯 **Precision engine for logos and product shots** — a deterministic chroma-key, no neural network, no blur.
-- 🔍 **Before/after preview** — check the cutout against a checkerboard before downloading.
-- 📥 **Lossless export** — download the result as a PNG at the original image's resolution.
+- ✅ **Pick what you keep** — select any subset of a batch's results and download them together as a `.zip`.
+- 📥 **Lossless export** — every result is a PNG at the original image's resolution.
 
 ## How it works
 
@@ -58,6 +58,7 @@ npm run verify:cutout -- path/to/image.png output.png
 - [React](https://github.com/facebook/react) + [Vite](https://github.com/vitejs/vite)
 - [@imgly/background-removal](https://github.com/imgly/background-removal-js) — in-browser segmentation on top of ONNX Runtime Web
 - [sharp](https://github.com/lovell/sharp) — rasterizes the SVG brand assets into the PNGs shipped in `public/` and `.github/assets/` (`npm run generate:assets`)
+- [fflate](https://github.com/101arrowz/fflate) — bundles selected results into a `.zip` for download, client-side
 
 ## License
 
