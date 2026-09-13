@@ -2,20 +2,37 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cutOut } from "./lib/removeBackground.js";
 import { createBatchItems, runBatch } from "./lib/batch.js";
 import { zipBlobs } from "./lib/zip.js";
+import { getHfModel, getHfToken, setHfModel, setHfToken } from "./lib/onlineRemoveBackground.js";
 
 const THEMES = ["auto", "light", "dark"];
+const MODES = [
+  { id: "offline", label: "Offline" },
+  { id: "online", label: "Online AI" },
+];
 
-function useTheme() {
-  const [theme, setTheme] = useState(() => localStorage.getItem("lco_theme") || "auto");
+const ENGINE_LABELS = {
+  flat: "precision chroma-key",
+  "ai-offline": "AI segmentation (offline)",
+  "ai-online": "AI segmentation (online)",
+};
+
+function usePersistedState(key, fallback) {
+  const [value, setValue] = useState(() => localStorage.getItem(key) || fallback);
 
   useEffect(() => {
-    if (theme === "auto") {
-      document.documentElement.removeAttribute("data-theme");
-      localStorage.removeItem("lco_theme");
-    } else {
-      document.documentElement.setAttribute("data-theme", theme);
-      localStorage.setItem("lco_theme", theme);
-    }
+    if (value === fallback) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  }, [key, value, fallback]);
+
+  return [value, setValue];
+}
+
+function useTheme() {
+  const [theme, setTheme] = usePersistedState("lco_theme", "auto");
+
+  useEffect(() => {
+    if (theme === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
   return [theme, setTheme];
@@ -32,13 +49,19 @@ function revokeItem(item) {
 
 export default function App() {
   const [theme, setTheme] = useTheme();
+  const [mode, setMode] = usePersistedState("lco_mode", "offline");
   const [items, setItems] = useState([]);
   const [selected, setSelected] = useState(() => new Set());
   const [dragOver, setDragOver] = useState(false);
   const [zipping, setZipping] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [hfToken, setHfTokenField] = useState(() => getHfToken());
+  const [hfModel, setHfModelField] = useState(() => getHfModel());
   const inputRef = useRef(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   const doneItems = useMemo(() => items.filter((item) => item.status === "done"), [items]);
   const selectedItems = useMemo(() => doneItems.filter((item) => selected.has(item.id)), [doneItems, selected]);
@@ -53,7 +76,8 @@ export default function App() {
 
     const newItems = createBatchItems(files);
     setItems((prev) => [...prev, ...newItems]);
-    runBatch(newItems, cutOut, updateItem);
+    const cutOutFn = (file) => cutOut(file, null, { mode: modeRef.current });
+    runBatch(newItems, cutOutFn, updateItem);
   }, [updateItem]);
 
   useEffect(() => () => {
@@ -93,6 +117,19 @@ export default function App() {
     }
   };
 
+  const saveSettings = (e) => {
+    e.preventDefault();
+    setHfToken(hfToken.trim());
+    setHfModel(hfModel.trim());
+  };
+
+  const clearSettings = () => {
+    setHfTokenField("");
+    setHfModelField(getHfModel());
+    setHfToken("");
+    setHfModel("");
+  };
+
   return (
     <>
       <header className="topbar">
@@ -106,19 +143,68 @@ export default function App() {
           </h1>
           <p className="tagline">Cut the background out of any image, at full quality, without it ever leaving your browser.</p>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="controls-row">
           <span className="chip chip-local">100% local</span>
-          <div className="theme-switch">
+          <div className="switch">
+            {MODES.map((m) => (
+              <button key={m.id} type="button" className={mode === m.id ? "active" : ""} onClick={() => setMode(m.id)}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <div className="switch">
             {THEMES.map((t) => (
               <button key={t} type="button" className={theme === t ? "active" : ""} onClick={() => setTheme(t)}>
                 {t}
               </button>
             ))}
           </div>
+          <button type="button" className="btn-secondary" onClick={() => setShowSettings((v) => !v)}>
+            Settings
+          </button>
         </div>
       </header>
 
       <main className="app-shell">
+        {showSettings && (
+          <form className="settings-panel" onSubmit={saveSettings}>
+            <div className="field">
+              <label htmlFor="hf-token">Hugging Face API token</label>
+              <input
+                id="hf-token"
+                type="password"
+                autoComplete="off"
+                placeholder="hf_…"
+                value={hfToken}
+                onChange={(e) => setHfTokenField(e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="hf-model">Model id</label>
+              <input
+                id="hf-model"
+                type="text"
+                placeholder={getHfModel()}
+                value={hfModel}
+                onChange={(e) => setHfModelField(e.target.value)}
+              />
+            </div>
+            <p className="field-hint">
+              Used only when "Online AI" is selected, for images with a non-flat background. Create a free token at{" "}
+              <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">
+                huggingface.co/settings/tokens
+              </a>
+              . Stored only in this browser — never sent anywhere except Hugging Face's API when you use online mode.
+            </p>
+            <div className="field-actions">
+              <button type="submit">Save</button>
+              <button type="button" className="btn-secondary" onClick={clearSettings}>
+                Clear
+              </button>
+            </div>
+          </form>
+        )}
+
         <div
           className={`dropzone${dragOver ? " dragover" : ""}`}
           onClick={() => inputRef.current?.click()}
@@ -201,10 +287,9 @@ export default function App() {
                   <div className="batch-info">
                     <span className="batch-name">{item.name}</span>
                     {item.status === "error" && <span className="badge badge-error">{item.error}</span>}
-                    {item.status === "done" && (
-                      <span className="chip engine-chip">
-                        {item.engine === "flat" ? "precision chroma-key" : "AI segmentation"}
-                      </span>
+                    {item.status === "done" && <span className="chip engine-chip">{ENGINE_LABELS[item.engine]}</span>}
+                    {item.fallbackReason && (
+                      <span className="badge badge-pending">Online AI unavailable, used offline model instead</span>
                     )}
                   </div>
 
