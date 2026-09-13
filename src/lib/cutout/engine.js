@@ -192,14 +192,24 @@ function matteEdges(data, width, height, backgroundMask, edgeBand, matchRadius) 
     const dot = (data[i] - bg[0]) * vec[0] + (data[i + 1] - bg[1]) * vec[1] + (data[i + 2] - bg[2]) * vec[2];
     const t = Math.max(0, Math.min(1, dot / denom));
 
-    // Snap to the true foreground color scaled by the recovered coverage
-    // (t) instead of keeping the source's background-tinted blend.
-    out[i] = fg[0];
-    out[i + 1] = fg[1];
-    out[i + 2] = fg[2];
+    if (t <= 0) continue; // stays fully transparent
+
+    // The nearest foreground pixel only calibrates how much of this pixel's
+    // own color is background bleed (t) — the output color is this pixel's
+    // own value with that bleed subtracted, never a neighbor's color, or
+    // fine detail (hair, thin strokes) next to the cut gets flattened to
+    // whatever unrelated tone happens to be nearby.
+    const inv = 1 - t;
+    out[i] = clamp255((data[i] - inv * bg[0]) / t);
+    out[i + 1] = clamp255((data[i + 1] - inv * bg[1]) / t);
+    out[i + 2] = clamp255((data[i + 2] - inv * bg[2]) / t);
     out[i + 3] = Math.round(t * 255);
   }
   return out;
+}
+
+function clamp255(v) {
+  return v < 0 ? 0 : v > 255 ? 255 : Math.round(v);
 }
 
 /**
