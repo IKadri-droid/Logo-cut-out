@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Faint frame: what is left behind once the subject has been lifted out -->
+  <g fill="#ffffff">
+    <rect x="78" y="102" width="20" height="20"/>
+    <rect x="126" y="102" width="20" height="20"/>
+    <rect x="174" y="102" width="20" height="20"/>
+
+    <rect x="78" y="150" width="20" height="20"/>
+    <rect x="78" y="198" width="20" height="20"/>
+    <rect x="78" y="246" width="20" height="20"/>
+    <rect x="78" y="294" width="20" height="20"/>
+    <rect x="78" y="342" width="20" height="20"/>
+    <rect x="78" y="390" width="20" height="20"/>
+
+    <rect x="414" y="246" width="20" height="20"/>
+    <rect x="414" y="294" width="20" height="20"/>
+    <rect x="414" y="342" width="20" height="20"/>
+    <rect x="414" y="390" width="20" height="20"/>
+
+    <rect x="78" y="438" width="20" height="20"/>
+    <rect x="126" y="438" width="20" height="20"/>
+    <rect x="174" y="438" width="20" height="20"/>
+    <rect x="222" y="438" width="20" height="20"/>
+    <rect x="270" y="438" width="20" height="20"/>
+    <rect x="318" y="438" width="20" height="20"/>
+    <rect x="366" y="438" width="20" height="20"/>
+    <rect x="414" y="438" width="20" height="20"/>
+  </g>
+
+  <!-- Subject: the block lifted clear of the frame, toward the top-right -->
+  <g fill="#ffffff">
+    <rect x="260" y="44" width="40" height="40"/>
+    <rect x="308" y="44" width="40" height="40"/>
+    <rect x="356" y="44" width="40" height="40"/>
+
+    <rect x="212" y="92" width="40" height="40"/>
+    <rect x="260" y="92" width="40" height="40"/>
+    <rect x="308" y="92" width="40" height="40"/>
+    <rect x="356" y="92" width="40" height="40"/>
+    <rect x="404" y="92" width="40" height="40"/>
+
+    <rect x="212" y="140" width="40" height="40"/>
+    <rect x="260" y="140" width="40" height="40"/>
+    <rect x="308" y="140" width="40" height="40"/>
+    <rect x="356" y="140" width="40" height="40"/>
+    <rect x="404" y="140" width="40" height="40"/>
+
+    <rect x="212" y="188" width="40" height="40"/>
+    <rect x="260" y="188" width="40" height="40"/>
+    <rect x="308" y="188" width="40" height="40"/>
+    <rect x="356" y="188" width="40" height="40"/>
+    <rect x="404" y="188" width="40" height="40"/>
+
+    <rect x="260" y="236" width="40" height="40"/>
+    <rect x="308" y="236" width="40" height="40"/>
+    <rect x="356" y="236" width="40" height="40"/>
+  </g>
+</svg>
