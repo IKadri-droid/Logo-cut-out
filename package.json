@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "generate:assets": "node scripts/generate-assets.mjs"
+    "generate:assets": "node scripts/generate-assets.mjs",
+    "verify:cutout": "node scripts/verify-cutout.mjs"
   },
   "dependencies": {
     "@imgly/background-removal": "^1.5.9",

@@ -15,17 +15,21 @@
 ## Features
 
 - 🖼️ **Drag & drop or file picker** — PNG, JPEG or WebP in, transparent PNG out.
-- ⚡ **Fully client-side** — the neural network runs in your browser via WebAssembly/WebGPU; no image is ever sent to a server.
+- ⚡ **Fully client-side** — nothing is ever sent to a server, whichever engine below handles the cut.
+- 🎯 **Precision engine for logos and product shots** — a deterministic chroma-key, no neural network, no blur.
 - 🔍 **Before/after preview** — check the cutout against a checkerboard before downloading.
 - 📥 **Lossless export** — download the result as a PNG at the original image's resolution.
 
 ## How it works
 
-Background removal here is a two-part problem: figuring out *which* pixels belong to the subject, and keeping the pixels you already know are correct untouched.
+Background removal here is a three-part problem: figuring out *which* pixels belong to the subject, keeping the pixels you already know are correct untouched, and — the part naive cutouts get wrong — not letting the background's color bleed into the edge pixels you keep.
 
-Logo Cut-Out draws your image onto a canvas at its native resolution and only asks the segmentation model for one thing: an alpha mask separating subject from background. The model itself works on a downscaled copy internally (as every such model does), but that mask is then upscaled and applied on top of your original, unmodified pixel data — so every RGB value in the final image is the same value your source file had, never re-encoded or recompressed along the way. The export is a PNG, a lossless format, so no compression artifacts are introduced at the finish line either.
+That last part matters because most source images are already anti-aliased against their background: a logo's edge pixels aren't pure subject color, they're a blend with whatever was behind them. Slap an alpha mask on top of those pixels unchanged and you get a faint light/white halo around every edge — technically "the original pixels," but visibly degraded. Logo Cut-Out re-derives that edge ring instead of trusting it, with one of two engines depending on the image:
 
-Nothing leaves your machine: the model (via [`@imgly/background-removal`](https://github.com/imgly/background-removal-js)) runs in-browser on top of [ONNX Runtime Web](https://github.com/microsoft/onnxruntime), so there is no upload step and no server component at all.
+- **Flat/near-uniform background** (the common case for logos, product shots, icons — like the Microsoft logo or Poképixel-style cutouts this was built against): a border-connected flood fill (chroma key) finds the background with pixel precision, no model involved. Every pixel more than a couple of pixels from the cut keeps its exact source color; the thin boundary ring is re-matted against the nearest confirmed background/foreground colors, which is what removes the halo. Fast, deterministic, and available before any model even loads.
+- **Anything else** (a real photographic background): an in-browser AI segmentation model (via [`@imgly/background-removal`](https://github.com/imgly/background-removal-js), on top of [ONNX Runtime Web](https://github.com/microsoft/onnxruntime), WASM/WebGPU) estimates the mask. The same edge re-matting pass then runs on its output to strip the background tint from its boundary, too.
+
+Either way, the export is a PNG — a lossless format — so no compression artifacts sneak in at the finish line, and nothing ever leaves your machine: there is no upload step and no server component at all.
 
 ## Installation
 
@@ -41,6 +45,12 @@ Production build:
 ```bash
 npm run build     # outputs to dist/
 npm run preview   # preview the build locally
+```
+
+To check the flat-background engine against a real file without opening a browser:
+
+```bash
+npm run verify:cutout -- path/to/image.png output.png
 ```
 
 ## Tech stack

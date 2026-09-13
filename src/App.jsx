@@ -27,6 +27,7 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("idle"); // idle | working | done | error
   const [error, setError] = useState(null);
+  const [engine, setEngine] = useState(null); // "flat" | "ai"
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef(null);
 
@@ -35,12 +36,14 @@ export default function App() {
     setSourceUrl(URL.createObjectURL(file));
     setResultUrl(null);
     setError(null);
+    setEngine(null);
     setStatus("working");
     setProgress(0);
 
     try {
-      const blob = await cutOut(file, (ratio) => setProgress(ratio));
-      setResultUrl(URL.createObjectURL(blob));
+      const result = await cutOut(file, (ratio) => setProgress(ratio));
+      setResultUrl(URL.createObjectURL(result.blob));
+      setEngine(result.engine);
       setStatus("done");
     } catch (err) {
       setError(err?.message || "Background removal failed.");
@@ -139,7 +142,14 @@ export default function App() {
                 <img src={sourceUrl} alt="Original upload" />
               </div>
               <div className="preview-pane">
-                <span className="pane-label">Cut out</span>
+                <span className="pane-label">
+                  Cut out
+                  {engine && (
+                    <span className="chip engine-chip">
+                      {engine === "flat" ? "precision chroma-key" : "AI segmentation"}
+                    </span>
+                  )}
+                </span>
                 <div className="checker">
                   {resultUrl && <img src={resultUrl} alt="Background removed" />}
                 </div>
