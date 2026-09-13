@@ -1,5 +1,6 @@
 import { removeBackground as removeBackgroundAI } from "@imgly/background-removal";
 import { cutOutFlatBackground } from "./cutout/engine.js";
+import { removeBackgroundOnline } from "./onlineRemoveBackground.js";
 
 async function loadImageData(source) {
   const bitmap = await createImageBitmap(source);
@@ -23,28 +24,20 @@ function imageDataToPngBlob(data, width, height) {
 }
 
 /**
- * Cuts the subject out of `file`, picking the engine the image actually
- * needs instead of always reaching for a neural network:
+ * Cuts the subject out of `file`. `mode` picks what handles a non-flat
+ * background: `"offline"` (default) uses the AI model bundled in the
+ * browser, no network involved; `"online"` sends the image to a
+ * user-configured Hugging Face model instead, for better quality on hard
+ * cases, falling back to the offline model if that call fails for any
+ * reason (no token, rate limit, network).
  *
- * - Flat/near-uniform background (the common case for logos, product shots,
- *   icons): a deterministic chroma-key (border-connected flood fill) plus
- *   edge re-matting runs synchronously on this machine. Every pixel that
- *   isn't within a couple of pixels of the cut keeps its exact source
- *   color; the boundary ring is re-derived from the nearest confirmed
- *   background/foreground colors instead of the source's own
- *   background-tinted blend there, which is what removes the light halo a
- *   naive alpha cutout leaves behind. No model, no download, no loss.
- * - Anything else (a real photographic background): an in-browser AI
- *   segmentation model (WASM/WebGPU, via `@imgly/background-removal`)
- *   estimates a soft alpha mask directly, which is returned as-is — a
- *   photographic mask can legitimately have partial transparency far from
- *   any hard edge (hair, motion blur, glow), so re-snapping it to the
- *   nearest "confident" color like the flat-background path does would
- *   corrupt exactly those pixels.
+ * A flat/near-uniform background always takes the deterministic
+ * chroma-key path regardless of `mode` — no model does that better.
  *
- * Returns `{ blob, engine }`, `engine` being `"flat"` or `"ai"`.
+ * Returns `{ blob, engine, fallbackReason? }`, `engine` being `"flat"`,
+ * `"ai-offline"` or `"ai-online"`.
  */
-export async function cutOut(file, onProgress) {
+export async function cutOut(file, onProgress, { mode = "offline" } = {}) {
   const original = await loadImageData(file);
 
   const flat = cutOutFlatBackground({ data: original.data, width: original.width, height: original.height });
@@ -54,8 +47,21 @@ export async function cutOut(file, onProgress) {
     return { blob, engine: "flat" };
   }
 
+  if (mode === "online") {
+    try {
+      const blob = await removeBackgroundOnline(file);
+      onProgress?.(1, "online-ai");
+      return { blob, engine: "ai-online" };
+    } catch (err) {
+      const blob = await removeBackgroundAI(file, {
+        progress: (key, current, total) => onProgress?.(total > 0 ? current / total : 0, key),
+      });
+      return { blob, engine: "ai-offline", fallbackReason: err?.message };
+    }
+  }
+
   const blob = await removeBackgroundAI(file, {
     progress: (key, current, total) => onProgress?.(total > 0 ? current / total : 0, key),
   });
-  return { blob, engine: "ai" };
+  return { blob, engine: "ai-offline" };
 }

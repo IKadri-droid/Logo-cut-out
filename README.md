@@ -19,6 +19,7 @@
 - 🎯 **Precision engine for logos and product shots** — a deterministic chroma-key, no neural network, no blur.
 - ✅ **Pick what you keep** — select any subset of a batch's results and download them together as a `.zip`.
 - 📥 **Lossless export** — every result is a PNG at the original image's resolution.
+- 🌐 **Optional online AI mode** — for hard photographic cases, route the cut through a stronger model on Hugging Face instead of the bundled one, using your own free API token.
 
 ## How it works
 
@@ -28,6 +29,14 @@ That last part matters because most source images are already anti-aliased again
 
 - **Flat/near-uniform background** (the common case for logos, product shots, icons — like the Microsoft logo or Poképixel-style cutouts this was built against): a border-connected flood fill (chroma key) finds the background with pixel precision, no model involved. Every pixel more than a couple of pixels from the cut keeps its exact source color; the thin boundary ring is re-matted against the nearest confirmed background/foreground colors, which is what removes the halo. Fast, deterministic, and available before any model even loads.
 - **Anything else** (a real photographic background): an in-browser AI segmentation model (via [`@imgly/background-removal`](https://github.com/imgly/background-removal-js), on top of [ONNX Runtime Web](https://github.com/microsoft/onnxruntime), WASM/WebGPU) estimates a soft alpha mask directly. It's used as-is — a photographic mask can legitimately stay partially transparent far from any hard edge (hair, motion blur, a glow), so forcing it through the same hard re-matting as the flat-background path would corrupt exactly those pixels.
+
+### Online AI mode (optional)
+
+The offline model is a good general-purpose segmenter, but it isn't the strongest one available for hard cases (busy backgrounds, fine hair). Switching the topbar to **Online AI** routes non-flat cuts through a model of your choice on the [Hugging Face Inference API](https://huggingface.co/docs/api-inference) instead — [`briaai/RMBG-2.0`](https://huggingface.co/briaai/RMBG-2.0) by default, one of the strongest open background-removal models available. This needs a free Hugging Face account and API token, entered in **Settings** and kept only in this browser's `localStorage` — the app talks to Hugging Face directly, there is no server of ours in between. If the call fails for any reason (no token, rate limit, network), the image is silently reprocessed with the offline model instead and the card says so.
+
+Flat backgrounds still always use the chroma-key engine regardless of this setting — no model beats an exact pixel match.
+
+Note on licensing: RMBG-2.0's default weights are released for **non-commercial use**; check [its model card](https://huggingface.co/briaai/RMBG-2.0) before using online mode for anything commercial, or point Settings at a different model id.
 
 Either way, the export is a PNG — a lossless format — so no compression artifacts sneak in at the finish line, and nothing ever leaves your machine: there is no upload step and no server component at all.
 
@@ -59,6 +68,7 @@ npm run verify:cutout -- path/to/image.png output.png
 - [@imgly/background-removal](https://github.com/imgly/background-removal-js) — in-browser segmentation on top of ONNX Runtime Web
 - [sharp](https://github.com/lovell/sharp) — rasterizes the SVG brand assets into the PNGs shipped in `public/` and `.github/assets/` (`npm run generate:assets`)
 - [fflate](https://github.com/101arrowz/fflate) — bundles selected results into a `.zip` for download, client-side
+- [Hugging Face Inference API](https://huggingface.co/docs/api-inference) — optional stronger model for the "Online AI" mode, called directly from the browser with your own token
 
 ## License
 
