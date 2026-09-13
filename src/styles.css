@@ -278,7 +278,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .batch-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1px;
   background: var(--border);
   border: 1px solid var(--border);
@@ -295,6 +295,30 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .batch-card.selected { border-top-color: var(--accent); }
 
+.batch-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.batch-pane { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+
+.batch-pane-label {
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.batch-pane img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  border: 1px solid var(--border);
+}
+
 .batch-thumb {
   position: relative;
   aspect-ratio: 1 / 1;
@@ -302,6 +326,15 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.batch-status-text {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .batch-select {

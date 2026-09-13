@@ -25,6 +25,11 @@ function downloadNameFor(item) {
   return item.name.replace(/\.[^.]+$/, "") + "-cutout.png";
 }
 
+function revokeItem(item) {
+  URL.revokeObjectURL(item.sourceUrl);
+  if (item.resultUrl) URL.revokeObjectURL(item.resultUrl);
+}
+
 export default function App() {
   const [theme, setTheme] = useTheme();
   const [items, setItems] = useState([]);
@@ -32,10 +37,34 @@ export default function App() {
   const [dragOver, setDragOver] = useState(false);
   const [zipping, setZipping] = useState(false);
   const inputRef = useRef(null);
-  const urlsRef = useRef(new Map());
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
   const doneItems = useMemo(() => items.filter((item) => item.status === "done"), [items]);
   const selectedItems = useMemo(() => doneItems.filter((item) => selected.has(item.id)), [doneItems, selected]);
+
+  const updateItem = useCallback((id, patch) => {
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  }, []);
+
+  const onFilesChosen = useCallback((fileList) => {
+    const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
+    if (files.length === 0) return;
+
+    const newItems = createBatchItems(files);
+    setItems((prev) => [...prev, ...newItems]);
+    runBatch(newItems, cutOut, updateItem);
+  }, [updateItem]);
+
+  useEffect(() => () => {
+    for (const item of itemsRef.current) revokeItem(item);
+  }, []);
+
+  const clearAll = () => {
+    for (const item of items) revokeItem(item);
+    setItems([]);
+    setSelected(new Set());
+  };
 
   const toggleSelected = (id) => {
     setSelected((prev) => {
@@ -62,41 +91,6 @@ export default function App() {
     } finally {
       setZipping(false);
     }
-  };
-
-  const updateItem = useCallback((id, patch) => {
-    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
-  }, []);
-
-  const onFilesChosen = useCallback((fileList) => {
-    const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
-    if (files.length === 0) return;
-
-    const newItems = createBatchItems(files);
-    setItems((prev) => [...prev, ...newItems]);
-    runBatch(newItems, cutOut, updateItem);
-  }, [updateItem]);
-
-  useEffect(() => {
-    for (const item of items) {
-      if (item.resultBlob && !urlsRef.current.has(item.id)) {
-        urlsRef.current.set(item.id, URL.createObjectURL(item.resultBlob));
-      }
-    }
-  }, [items]);
-
-  useEffect(() => {
-    const urls = urlsRef.current;
-    return () => {
-      for (const url of urls.values()) URL.revokeObjectURL(url);
-    };
-  }, []);
-
-  const clearAll = () => {
-    for (const url of urlsRef.current.values()) URL.revokeObjectURL(url);
-    urlsRef.current.clear();
-    setItems([]);
-    setSelected(new Set());
   };
 
   return (
@@ -177,22 +171,35 @@ export default function App() {
             <div className="batch-grid">
               {items.map((item) => (
                 <div className={`batch-card${selected.has(item.id) ? " selected" : ""}`} key={item.id}>
-                  <div className="batch-thumb checker">
-                    {item.status === "done" && <img src={urlsRef.current.get(item.id)} alt={item.name} />}
-                    {item.status === "done" && (
-                      <label className="batch-select">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(item.id)}
-                          onChange={() => toggleSelected(item.id)}
-                        />
-                      </label>
-                    )}
+                  <div className="batch-compare">
+                    <div className="batch-pane">
+                      <span className="batch-pane-label">Original</span>
+                      <img src={item.sourceUrl} alt={item.name} />
+                    </div>
+                    <div className="batch-pane">
+                      <span className="batch-pane-label">Cut out</span>
+                      <div className="batch-thumb checker">
+                        {item.status === "done" && <img src={item.resultUrl} alt={`${item.name}, background removed`} />}
+                        {item.status !== "done" && item.status !== "error" && (
+                          <span className="batch-status-text">
+                            {item.status === "processing" ? "Processing…" : "Queued"}
+                          </span>
+                        )}
+                        {item.status === "done" && (
+                          <label className="batch-select">
+                            <input
+                              type="checkbox"
+                              checked={selected.has(item.id)}
+                              onChange={() => toggleSelected(item.id)}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
                   </div>
+
                   <div className="batch-info">
                     <span className="batch-name">{item.name}</span>
-                    {item.status === "processing" && <span className="badge badge-pending">Processing…</span>}
-                    {item.status === "queued" && <span className="badge badge-pending">Queued</span>}
                     {item.status === "error" && <span className="badge badge-error">{item.error}</span>}
                     {item.status === "done" && (
                       <span className="chip engine-chip">
@@ -200,8 +207,9 @@ export default function App() {
                       </span>
                     )}
                   </div>
+
                   {item.status === "done" && (
-                    <a href={urlsRef.current.get(item.id)} download={downloadNameFor(item)}>
+                    <a href={item.resultUrl} download={downloadNameFor(item)}>
                       <button type="button" className="btn-secondary">Download</button>
                     </a>
                   )}
