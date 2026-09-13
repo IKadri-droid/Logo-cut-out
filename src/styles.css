@@ -278,7 +278,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .batch-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(480px, 100%), 1fr));
   gap: 1px;
   background: var(--border);
   border: 1px solid var(--border);
@@ -296,11 +296,13 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .batch-card.selected { border-top-color: var(--accent); }
 
 .batch-compare {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
-  max-width: 380px;
-  margin: 0 auto;
+}
+
+@media (max-width: 480px) {
+  .batch-compare { grid-template-columns: 1fr; }
 }
 
 .batch-pane { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
