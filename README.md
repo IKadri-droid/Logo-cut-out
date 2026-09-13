@@ -14,7 +14,7 @@
 
 ## Features
 
-- 🖼️ **Drag & drop or file picker, one image or a batch** — PNG, JPEG or WebP in, transparent PNG out.
+- 🖼️ **Drag & drop, paste, or file picker, one image or a batch** — PNG, JPEG or WebP in, transparent PNG out. Copy an image from anywhere and Ctrl/Cmd+V it straight in.
 - ⚡ **Fully client-side** — nothing is ever sent to a server, whichever engine below handles the cut.
 - 🎯 **Precision engine for logos and product shots** — a deterministic chroma-key, no neural network, no blur.
 - ✅ **Pick what you keep** — select any subset of a batch's results and download them together as a `.zip`.
@@ -27,7 +27,7 @@ Background removal here is a three-part problem: figuring out *which* pixels bel
 
 That last part matters because most source images are already anti-aliased against their background: a logo's edge pixels aren't pure subject color, they're a blend with whatever was behind them. Slap an alpha mask on top of those pixels unchanged and you get a faint light/white halo around every edge — technically "the original pixels," but visibly degraded. Logo Cut-Out re-derives that edge ring instead of trusting it, with one of two engines depending on the image:
 
-- **Flat/near-uniform background** (the common case for logos, product shots, icons — like the Microsoft logo or Poképixel-style cutouts this was built against): a border-connected flood fill (chroma key) finds the background with pixel precision, no model involved. Every pixel more than a couple of pixels from the cut keeps its exact source color; the thin boundary ring is re-matted against the nearest confirmed background/foreground colors, which is what removes the halo. Fast, deterministic, and available before any model even loads.
+- **Flat/near-uniform background** (the common case for logos, product shots, icons — like the Microsoft logo or a product photo with a soft drop shadow): a border-connected flood fill (chroma key) finds the background with pixel precision, no model involved. It models the background as a *shaded* color rather than a fixed one — a drop shadow is the background color uniformly darkened, never a different hue — so a gradual studio shadow is removed in full instead of leaving a pale remnant, while a real subject edge (a genuine hue change, not just a brightness one) still stops it cold. Every pixel more than a couple of pixels from the cut keeps its exact source color; the thin boundary ring is re-matted using that pixel's own color, decontaminated against the background rather than snapped to a neighbor's, which is what removes the halo without smudging fine detail (hair, thin strokes) next to it. Fast, deterministic, and available before any model even loads.
 - **Anything else** (a real photographic background): an in-browser AI segmentation model (via [`@imgly/background-removal`](https://github.com/imgly/background-removal-js), on top of [ONNX Runtime Web](https://github.com/microsoft/onnxruntime), WASM/WebGPU) estimates a soft alpha mask directly. It's used as-is — a photographic mask can legitimately stay partially transparent far from any hard edge (hair, motion blur, a glow), so forcing it through the same hard re-matting as the flat-background path would corrupt exactly those pixels.
 
 ### Online AI mode (optional)
