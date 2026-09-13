@@ -17,6 +17,14 @@ const ENGINE_LABELS = {
   "ai-online": "AI segmentation (online)",
 };
 
+function ZoomIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
+    </svg>
+  );
+}
+
 function usePersistedState(key, fallback) {
   const [value, setValue] = useState(() => localStorage.getItem(key) || fallback);
 
@@ -56,6 +64,7 @@ export default function App() {
   const [dragOver, setDragOver] = useState(false);
   const [zipping, setZipping] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [lightbox, setLightbox] = useState(null);
   const [hfToken, setHfTokenField] = useState(() => getHfToken());
   const [hfModel, setHfModelField] = useState(() => getHfModel());
   const inputRef = useRef(null);
@@ -106,6 +115,15 @@ export default function App() {
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
   }, [onFilesChosen]);
+
+  useEffect(() => {
+    if (!lightbox) return;
+    const handleKey = (e) => {
+      if (e.key === "Escape") setLightbox(null);
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [lightbox]);
 
   const clearAll = () => {
     for (const item of items) revokeItem(item);
@@ -297,7 +315,17 @@ export default function App() {
                   <div className="batch-compare">
                     <div className="batch-pane">
                       <span className="batch-pane-label">Original</span>
-                      <img src={item.sourceUrl} alt={item.name} />
+                      <div className="batch-pane-media">
+                        <img src={item.sourceUrl} alt={item.name} />
+                        <button
+                          type="button"
+                          className="zoom-btn"
+                          aria-label="Enlarge original"
+                          onClick={() => setLightbox({ src: item.sourceUrl, alt: item.name, checker: false })}
+                        >
+                          <ZoomIcon />
+                        </button>
+                      </div>
                     </div>
                     <div className="batch-pane">
                       <span className="batch-pane-label">Cut out</span>
@@ -309,13 +337,23 @@ export default function App() {
                           </span>
                         )}
                         {item.status === "done" && (
-                          <label className="batch-select">
-                            <input
-                              type="checkbox"
-                              checked={selected.has(item.id)}
-                              onChange={() => toggleSelected(item.id)}
-                            />
-                          </label>
+                          <>
+                            <label className="batch-select">
+                              <input
+                                type="checkbox"
+                                checked={selected.has(item.id)}
+                                onChange={() => toggleSelected(item.id)}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              className="zoom-btn"
+                              aria-label="Enlarge result"
+                              onClick={() => setLightbox({ src: item.resultUrl, alt: `${item.name}, background removed`, checker: true })}
+                            >
+                              <ZoomIcon />
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -341,6 +379,20 @@ export default function App() {
           </section>
         )}
       </main>
+
+      {lightbox && (
+        <div className="lightbox-overlay" onClick={() => setLightbox(null)}>
+          <button type="button" className="lightbox-close" aria-label="Close" onClick={() => setLightbox(null)}>
+            ×
+          </button>
+          <img
+            className={lightbox.checker ? "checker" : ""}
+            src={lightbox.src}
+            alt={lightbox.alt}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </>
   );
 }
