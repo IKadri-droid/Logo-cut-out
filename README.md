@@ -19,6 +19,7 @@
 - 🎯 **Precision engine for logos and product shots** — a deterministic chroma-key, no neural network, no blur.
 - ✅ **Pick what you keep** — select any subset of a batch's results and download them together as a `.zip`.
 - 📥 **Lossless export** — every result is a PNG at the original image's resolution.
+- 🔍 **Zoom to check the edges** — enlarge the original or the cut-out result full size before deciding to keep it.
 - 🌐 **Optional online AI mode** — for hard photographic cases, route the cut through a stronger model on Hugging Face instead of the bundled one, using your own free API token.
 
 ## How it works
