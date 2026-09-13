@@ -1,4 +1,6 @@
 const DEFAULT_SHADING_RESIDUAL = 32;
+const DEFAULT_DARK_BG_DISTANCE = 22;
+const DARK_BG_BRIGHTNESS = 45;
 const DEFAULT_EDGE_BAND = 4;
 const DEFAULT_MATCH_RADIUS = 6;
 const UNIFORM_STD_LIMIT = 14;
@@ -60,6 +62,12 @@ function colorDistance(r, g, b, ref) {
  * vignette, which dims light without shifting its hue. A real subject
  * edge has high residual (its hue differs from the background's), while
  * every point of a shadow gradient, however dark, has a low one.
+ *
+ * This model is meaningless for a near-black background: hue itself is
+ * undefined at zero brightness, so any dark pixel — including genuinely
+ * dark artwork (black linework, a dark jacket) — reads as "background,
+ * darkened all the way to zero", however saturated its real color is.
+ * Callers should use plain color distance instead when `ref` is that dark.
  */
 function shadingResidual(r, g, b, ref) {
   const refMagSq = ref[0] * ref[0] + ref[1] * ref[1] + ref[2] * ref[2] || 1;
@@ -88,19 +96,26 @@ export function detectUniformBackground(data, width, height) {
  * brightness has drifted — which is what lets this consume a full drop
  * shadow gradient in one pass without needing a fragile pixel-to-pixel
  * tolerance walk (that can leak into the subject through any soft
- * highlight on its surface).
+ * highlight on its surface). For a near-black background, where that
+ * model degenerates, a plain, tight color distance is used instead.
  */
-function floodBackgroundMask(data, width, height, bgColor, residualLimit) {
+function floodBackgroundMask(data, width, height, bgColor, residualLimit, darkBgDistance) {
   const size = width * height;
   const mask = new Uint8Array(size);
   const queue = new Int32Array(size);
   let head = 0;
   let tail = 0;
 
+  const bgBrightness = (bgColor[0] + bgColor[1] + bgColor[2]) / 3;
+  const exceedsLimit =
+    bgBrightness < DARK_BG_BRIGHTNESS
+      ? (r, g, b) => colorDistance(r, g, b, bgColor) > darkBgDistance
+      : (r, g, b) => shadingResidual(r, g, b, bgColor) > residualLimit;
+
   const enqueue = (idx) => {
     if (mask[idx]) return;
     const i = idx * 4;
-    if (shadingResidual(data[i], data[i + 1], data[i + 2], bgColor) > residualLimit) return;
+    if (exceedsLimit(data[i], data[i + 1], data[i + 2])) return;
     mask[idx] = 1;
     queue[tail++] = idx;
   };
@@ -248,6 +263,7 @@ export function cutOutFlatBackground(imageData, options = {}) {
   const { data, width, height } = imageData;
   const {
     residualLimit = DEFAULT_SHADING_RESIDUAL,
+    darkBgDistance = DEFAULT_DARK_BG_DISTANCE,
     edgeBand = DEFAULT_EDGE_BAND,
     matchRadius = DEFAULT_MATCH_RADIUS,
   } = options;
@@ -255,7 +271,7 @@ export function cutOutFlatBackground(imageData, options = {}) {
   const { color: bgColor, isUniform } = detectUniformBackground(data, width, height);
   if (!isUniform) return null;
 
-  const backgroundMask = floodBackgroundMask(data, width, height, bgColor, residualLimit);
+  const backgroundMask = floodBackgroundMask(data, width, height, bgColor, residualLimit, darkBgDistance);
   const out = matteEdges(data, width, height, backgroundMask, edgeBand, matchRadius);
   return { data: out, width, height };
 }
