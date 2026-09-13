@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cutOut } from "./lib/removeBackground.js";
+import { createBatchItems, runBatch } from "./lib/batch.js";
 
 const THEMES = ["auto", "light", "dark"];
 
@@ -19,54 +20,50 @@ function useTheme() {
   return [theme, setTheme];
 }
 
+function downloadNameFor(item) {
+  return item.name.replace(/\.[^.]+$/, "") + "-cutout.png";
+}
+
 export default function App() {
   const [theme, setTheme] = useTheme();
-  const [sourceFile, setSourceFile] = useState(null);
-  const [sourceUrl, setSourceUrl] = useState(null);
-  const [resultUrl, setResultUrl] = useState(null);
-  const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState("idle"); // idle | working | done | error
-  const [error, setError] = useState(null);
-  const [engine, setEngine] = useState(null); // "flat" | "ai"
+  const [items, setItems] = useState([]);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef(null);
+  const urlsRef = useRef(new Map());
 
-  const runCutOut = useCallback(async (file) => {
-    setSourceFile(file);
-    setSourceUrl(URL.createObjectURL(file));
-    setResultUrl(null);
-    setError(null);
-    setEngine(null);
-    setStatus("working");
-    setProgress(0);
-
-    try {
-      const result = await cutOut(file, (ratio) => setProgress(ratio));
-      setResultUrl(URL.createObjectURL(result.blob));
-      setEngine(result.engine);
-      setStatus("done");
-    } catch (err) {
-      setError(err?.message || "Background removal failed.");
-      setStatus("error");
-    }
+  const updateItem = useCallback((id, patch) => {
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   }, []);
 
-  const onFileChosen = useCallback(
-    (fileList) => {
-      const file = fileList?.[0];
-      if (file && file.type.startsWith("image/")) runCutOut(file);
-    },
-    [runCutOut],
-  );
+  const onFilesChosen = useCallback((fileList) => {
+    const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
+    if (files.length === 0) return;
+
+    const newItems = createBatchItems(files);
+    setItems((prev) => [...prev, ...newItems]);
+    runBatch(newItems, cutOut, updateItem);
+  }, [updateItem]);
 
   useEffect(() => {
-    return () => {
-      if (sourceUrl) URL.revokeObjectURL(sourceUrl);
-      if (resultUrl) URL.revokeObjectURL(resultUrl);
-    };
-  }, [sourceUrl, resultUrl]);
+    for (const item of items) {
+      if (item.resultBlob && !urlsRef.current.has(item.id)) {
+        urlsRef.current.set(item.id, URL.createObjectURL(item.resultBlob));
+      }
+    }
+  }, [items]);
 
-  const downloadName = sourceFile ? sourceFile.name.replace(/\.[^.]+$/, "") + "-cutout.png" : "cutout.png";
+  useEffect(() => {
+    const urls = urlsRef.current;
+    return () => {
+      for (const url of urls.values()) URL.revokeObjectURL(url);
+    };
+  }, []);
+
+  const clearAll = () => {
+    for (const url of urlsRef.current.values()) URL.revokeObjectURL(url);
+    urlsRef.current.clear();
+    setItems([]);
+  };
 
   return (
     <>
@@ -105,67 +102,54 @@ export default function App() {
           onDrop={(e) => {
             e.preventDefault();
             setDragOver(false);
-            onFileChosen(e.dataTransfer.files);
+            onFilesChosen(e.dataTransfer.files);
           }}
         >
           <input
             ref={inputRef}
             type="file"
             accept="image/*"
-            onChange={(e) => onFileChosen(e.target.files)}
+            multiple
+            onChange={(e) => onFilesChosen(e.target.files)}
           />
-          <div className="dz-label">Drop an image, or click to choose one</div>
+          <div className="dz-label">Drop images, or click to choose one or more</div>
           <div className="dz-hint">PNG, JPEG or WebP — processed on this machine only.</div>
         </div>
 
-        {status === "working" && (
-          <section className="progress-area">
-            <div className="progress-row">
-              <div className="label">
-                <span>Removing background</span>
-                <span>{Math.round(progress * 100)}%</span>
-              </div>
-              <div className="progress-track">
-                <div className="progress-fill" style={{ width: `${Math.max(progress * 100, 4)}%` }} />
-              </div>
+        {items.length > 0 && (
+          <section className="batch-area">
+            <div className="batch-toolbar">
+              <span className="batch-count">{items.length} image{items.length > 1 ? "s" : ""}</span>
+              <button type="button" className="btn-secondary" onClick={clearAll}>
+                Clear all
+              </button>
             </div>
-          </section>
-        )}
 
-        {status === "error" && <div className="alert">{error}</div>}
-
-        {(status === "done" || status === "working") && sourceUrl && (
-          <section className="preview-area">
-            <div className="preview-grid">
-              <div className="preview-pane">
-                <span className="pane-label">Original</span>
-                <img src={sourceUrl} alt="Original upload" />
-              </div>
-              <div className="preview-pane">
-                <span className="pane-label">
-                  Cut out
-                  {engine && (
-                    <span className="chip engine-chip">
-                      {engine === "flat" ? "precision chroma-key" : "AI segmentation"}
-                    </span>
+            <div className="batch-grid">
+              {items.map((item) => (
+                <div className="batch-card" key={item.id}>
+                  <div className="batch-thumb checker">
+                    {item.status === "done" && <img src={urlsRef.current.get(item.id)} alt={item.name} />}
+                  </div>
+                  <div className="batch-info">
+                    <span className="batch-name">{item.name}</span>
+                    {item.status === "processing" && <span className="badge badge-pending">Processing…</span>}
+                    {item.status === "queued" && <span className="badge badge-pending">Queued</span>}
+                    {item.status === "error" && <span className="badge badge-error">{item.error}</span>}
+                    {item.status === "done" && (
+                      <span className="chip engine-chip">
+                        {item.engine === "flat" ? "precision chroma-key" : "AI segmentation"}
+                      </span>
+                    )}
+                  </div>
+                  {item.status === "done" && (
+                    <a href={urlsRef.current.get(item.id)} download={downloadNameFor(item)}>
+                      <button type="button" className="btn-secondary">Download</button>
+                    </a>
                   )}
-                </span>
-                <div className="checker">
-                  {resultUrl && <img src={resultUrl} alt="Background removed" />}
                 </div>
-              </div>
+              ))}
             </div>
-
-            {resultUrl && (
-              <div className="result-actions">
-                <a href={resultUrl} download={downloadName}>
-                  <button type="button">Download PNG</button>
-                </a>
-                <button type="button" className="btn-secondary" onClick={() => inputRef.current?.click()}>
-                  Try another image
-                </button>
-              </div>
-            )}
           </section>
         )}
       </main>
