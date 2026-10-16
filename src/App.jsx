@@ -3,11 +3,16 @@ import { cutOut } from "./lib/removeBackground.js";
 import { createBatchItems, runBatch } from "./lib/batch.js";
 import { zipBlobs } from "./lib/zip.js";
 import { getHfModel, getHfToken, setHfModel, setHfToken } from "./lib/onlineRemoveBackground.js";
+import SignaturePad from "./SignaturePad.jsx";
 
 const THEMES = ["auto", "light", "dark"];
 const MODES = [
   { id: "offline", label: "Offline" },
   { id: "online", label: "Online AI" },
+];
+const TOOLS = [
+  { id: "cutout", label: "Cut out" },
+  { id: "signature", label: "Signature" },
 ];
 
 const ENGINE_LABELS = {
@@ -59,6 +64,7 @@ function revokeItem(item) {
 export default function App() {
   const [theme, setTheme] = useTheme();
   const [mode, setMode] = usePersistedState("lco_mode", "offline");
+  const [tool, setTool] = usePersistedState("lco_tool", "cutout");
   const [items, setItems] = useState([]);
   const [selected, setSelected] = useState(() => new Set());
   const [dragOver, setDragOver] = useState(false);
@@ -95,6 +101,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (tool !== "cutout") return;
     const handlePaste = (e) => {
       const target = e.target;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
@@ -114,7 +121,7 @@ export default function App() {
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [onFilesChosen]);
+  }, [onFilesChosen, tool]);
 
   useEffect(() => {
     if (!lightbox) return;
@@ -217,6 +224,18 @@ export default function App() {
       </header>
 
       <main className="app-shell">
+        <nav className="tool-tabs">
+          {TOOLS.map((t) => (
+            <button key={t.id} type="button" className={tool === t.id ? "active" : ""} onClick={() => setTool(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </nav>
+
+        {tool === "signature" && <SignaturePad />}
+
+        {tool === "cutout" && (
+        <>
         {showSettings && (
           <form className="settings-panel" onSubmit={saveSettings}>
             <div className="field">
@@ -377,6 +396,8 @@ export default function App() {
               ))}
             </div>
           </section>
+        )}
+        </>
         )}
       </main>
 
