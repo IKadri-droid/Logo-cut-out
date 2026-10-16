@@ -20,6 +20,7 @@
 - ✅ **Pick what you keep** — select any subset of a batch's results and download them together as a `.zip`.
 - 📥 **Lossless export** — every result is a PNG at the original image's resolution.
 - ✍️ **Signature pad** — sign with the mouse (or a pen tablet) in black on white, white on black, blue ink or on a transparent background, then copy it or download it as a cropped, high-resolution PNG.
+- 📄 **Document editor** — open a PDF (or start from a blank A4 page), drop logos, signatures or cut-out results onto any page, move and resize them, add text, and download the edited PDF. The original pages are kept as-is, nothing is re-rendered.
 - 🔍 **Zoom to check the edges** — enlarge the original or the cut-out result full size before deciding to keep it.
 - 🌐 **Optional online AI mode** — for hard photographic cases, route the cut through a stronger model on Hugging Face instead of the bundled one, using your own free API token.
 
@@ -71,6 +72,8 @@ npm run verify:cutout -- path/to/image.png output.png
 - [@imgly/background-removal](https://github.com/imgly/background-removal-js) — in-browser segmentation on top of ONNX Runtime Web
 - [sharp](https://github.com/lovell/sharp) — rasterizes the SVG brand assets into the PNGs shipped in `public/` and `.github/assets/` (`npm run generate:assets`)
 - [fflate](https://github.com/101arrowz/fflate) — bundles selected results into a `.zip` for download, client-side
+- [PDF.js](https://github.com/mozilla/pdf.js) — renders PDF pages in the Document tab
+- [pdf-lib](https://github.com/Hopding/pdf-lib) — stamps images and text onto the original PDF for export
 - [Hugging Face Inference API](https://huggingface.co/docs/api-inference) — optional stronger model for the "Online AI" mode, called directly from the browser with your own token
 
 ## License
