@@ -95,7 +95,7 @@ function renderSignature(strokes, style, padSize, trim) {
   return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 }
 
-export default function SignaturePad() {
+export default function SignaturePad({ onSendToDocument }) {
   const [styleId, setStyleId] = useState(STYLES[0].id);
   const [weightId, setWeightId] = useState("medium");
   const [strokes, setStrokes] = useState([]);
@@ -206,6 +206,11 @@ export default function SignaturePad() {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const sendToDocument = async () => {
+    const blob = await renderSignature(strokes, style, sizeRef.current, trim);
+    onSendToDocument(blob, `signature-${style.id}.png`);
+  };
+
   const isEmpty = strokes.length === 0;
 
   return (
@@ -276,6 +281,9 @@ export default function SignaturePad() {
           </button>
           <button type="button" className="btn-secondary" disabled={isEmpty} onClick={copy}>
             {copied ? "Copied" : "Copy"}
+          </button>
+          <button type="button" className="btn-secondary" disabled={isEmpty} onClick={sendToDocument}>
+            Add to document
           </button>
           <button type="button" disabled={isEmpty} onClick={download}>
             Download PNG

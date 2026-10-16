@@ -4,6 +4,7 @@ import { createBatchItems, runBatch } from "./lib/batch.js";
 import { zipBlobs } from "./lib/zip.js";
 import { getHfModel, getHfToken, setHfModel, setHfToken } from "./lib/onlineRemoveBackground.js";
 import SignaturePad from "./SignaturePad.jsx";
+import DocumentEditor from "./DocumentEditor.jsx";
 
 const THEMES = ["auto", "light", "dark"];
 const MODES = [
@@ -13,7 +14,10 @@ const MODES = [
 const TOOLS = [
   { id: "cutout", label: "Cut out" },
   { id: "signature", label: "Signature" },
+  { id: "document", label: "Document" },
 ];
+
+let nextAssetId = 1;
 
 const ENGINE_LABELS = {
   passthrough: "already transparent",
@@ -67,6 +71,7 @@ export default function App() {
   const [tool, setTool] = usePersistedState("lco_tool", "cutout");
   const [items, setItems] = useState([]);
   const [selected, setSelected] = useState(() => new Set());
+  const [docAssets, setDocAssets] = useState([]);
   const [dragOver, setDragOver] = useState(false);
   const [zipping, setZipping] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -131,6 +136,24 @@ export default function App() {
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [lightbox]);
+
+  // Images available to the Document tab: imported there directly, or sent from
+  // a cut-out result or the signature pad. Returns the new entries so the caller can place them.
+  const addDocAssets = useCallback((entries) => {
+    const created = entries.map(({ blob, name }) => ({
+      id: `asset-${nextAssetId++}`,
+      name,
+      blob,
+      url: URL.createObjectURL(blob),
+    }));
+    setDocAssets((prev) => [...prev, ...created]);
+    return created;
+  }, []);
+
+  const sendToDocument = (blob, name) => {
+    addDocAssets([{ blob, name }]);
+    setTool("document");
+  };
 
   const clearAll = () => {
     for (const item of items) revokeItem(item);
@@ -232,7 +255,9 @@ export default function App() {
           ))}
         </nav>
 
-        {tool === "signature" && <SignaturePad />}
+        {tool === "signature" && <SignaturePad onSendToDocument={sendToDocument} />}
+
+        {tool === "document" && <DocumentEditor assets={docAssets} onAddAssets={addDocAssets} />}
 
         {tool === "cutout" && (
         <>
@@ -388,9 +413,18 @@ export default function App() {
                   </div>
 
                   {item.status === "done" && (
-                    <a href={item.resultUrl} download={downloadNameFor(item)}>
-                      <button type="button" className="btn-secondary">Download</button>
-                    </a>
+                    <div className="batch-actions">
+                      <a href={item.resultUrl} download={downloadNameFor(item)}>
+                        <button type="button" className="btn-secondary">Download</button>
+                      </a>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => sendToDocument(item.resultBlob, downloadNameFor(item))}
+                      >
+                        Add to document
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
